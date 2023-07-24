@@ -1,0 +1,401 @@
+version: "3.9"
+
+networks:
+  default:
+    driver: bridge
+  npm_proxy:
+    name: npm_proxy
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.89.0/24
+
+x-environment: &default-tz-puid-pgid
+  TZ: $TZ
+  PUID: $PUID
+  PGID: $PGID
+
+x-common-keys-core: &common-keys-core
+  networks:
+    - npm_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: always
+x-common-keys-apps: &common-keys-apps
+  networks:
+    - npm_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+x-common-keys-media: &common-keys-media
+  networks:
+    - npm_proxy
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+services:
+
+# Ngnix Reverse Proxy Manager
+  npm:
+    <<: *common-keys-core
+    container_name: npm
+    image: jc21/nginx-proxy-manager:latest
+    ports:
+      - '80:80'
+      - '443:443'
+      - '81:81'
+    volumes:
+      - $DOCKERDIR/appdata/npm/config:/config
+      - $DOCKERDIR/appdata/npm/data:/data
+      - $DOCKERDIR/appdata/npm/letsencrypt:/etc/letsencrypt
+    environment:
+      DB_SQLITE_FILE: '/config/database.sqlite'
+      DISABLE_IPV6: 'true'
+# Portainer - Container 
+  portainer:
+    <<: *common-keys-core
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    command: -H unix:///var/run/docker.sock
+    ports:
+      - '9000:9000'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - $DOCKERDIR/appdata/portainer/data:/data
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+# Dashy - Dashboard
+  dashy:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    container_name: dashy
+    image: lissy93/dashy:latest
+    ports:
+      - '4000:80' # Public HTTP Port. Port Forwarding on Router is ON.
+    volumes:
+      - $DOCKERDIR/appdata/dashy/config:/config
+      #- $DOCKERDIR/appdata/dashy/assets/my-config.yml:/app/public/conf.yml
+      #- $DOCKERDIR/appdata/dashy/assets/item-icons:/app/public/item-icons
+    environment:
+      NODE_ENV: 'production'
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+# qBittorrent - Torrent downloader without VPN
+  qbittorrent:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    ports:
+      - '9050:9050'
+      - '6881:6881'
+      - '6881:6881/udp'
+    volumes:
+      - $DOCKERDIR/appdata/qbittorrent:/config
+      - $DATADIR:/storage  # /storage/downloads in qBittorrent
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+      UMASK_SET: '002'
+      WEBUI_PORT: '9050'
+  # Transmission - Torrent Download Client (SEEDING)
+  transmission:
+    image: lscr.io/linuxserver/transmission:latest
+    container_name: transmission
+    ports:
+      - '9091:9091'
+      - '51413:51413'
+      - '51413:51413/udp'
+    volumes:
+      - $DOCKERDIR/appdata/transmission/config:/config
+      - $DATADIR/downloads/trans-seeding:/storage/downloads
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+      TRANSMISSION_WEB_HOME: #optional
+      USER: '$USER'
+      PASS: '$PASSWORD'
+      WHITELIST: '' #optional
+      PEERPORT: '' #optional
+      HOST_WHITELIST: '' #optional
+      LOG_TO_STDOUT: 'true'
+      DOCKER_MODS: 'linuxserver/mods:transmission-transmissionic'
+
+# Jackett - Indexer management
+  jackett:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: jackett
+    ports:
+      - '9117:9117'
+    volumes:
+      - $DOCKERDIR/appdata/jackett/config:/config
+      - $DATADIR:/storage
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+      AUTO_UPDATE: 'true' #optional
+      RUN_OPTS: '' #optional
+# Radarr - Movie management
+  radarr:
+    <<: *common-keys-media
+    image: lscr.io/linuxserver/radarr:nightly # latest was causing "Error parsing column 45"
+    container_name: radarr
+    ports:
+      - '7878:7878'
+    volumes:
+      - $DOCKERDIR/appdata/radarr/config:/config
+      - $DATADIR:/storage
+      - $DATADIR/downloads:/storage/downloads
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+# Sonarr - TV Shows management
+  sonarr:
+    <<: *common-keys-media # See EXTENSION FIELDS at the top
+    image: lscr.io/linuxserver/sonarr
+    container_name: sonarr
+    ports:
+      - '8989:8989'
+    volumes:
+      - $DOCKERDIR/appdata/sonarr/config:/config
+      - $DATADIR:/storage
+      - $DATADIR/downloads:/storage/downloads
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+# Bazarr - Subtitle Management
+  bazarr:
+    <<: *common-keys-media # See EXTENSION FIELDS at the top
+    image: lscr.io/linuxserver/bazarr
+    container_name: bazarr
+    ports:
+      - '6767:6767'
+    volumes:
+      - $DOCKERDIR/appdata/bazarr:/config
+      - $DATADIR/media:/storage/media
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+# Plex - Media Server
+  plexms:
+    <<: *common-keys-media # See EXTENSION FIELDS at the top
+    image: plexinc/pms-docker
+    container_name: plexms
+    ports:
+      - '32400:32400/tcp'
+      - "3005:3005/tcp"
+      - "8324:8324/tcp"
+      - "32469:32469/tcp"
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
+      # - "33400:33400" # If you use Plex Web Tools
+    #devices:
+    #  - /dev/dri:/dev/dri # for harware transcoding
+    volumes:
+      - $DOCKERDIR/appdata/plexms/config:/config
+      - $DATADIR/media:/storage/media
+      - $DATADIR:/storage
+      - /dev/shm:/transcode
+    environment:
+      TZ: '$TZ'
+      HOSTNAME: '$PLEX_HOSTNAME'
+      PLEX_CLAIM: '$PLEX_CLAIM'
+      PLEX_UID: '$PUID'
+      PLEX_GID: '$PGID'
+      ADVERTISE_IP: '$PLEX_ADVERTISE_IP'
+# Plex Trakt Sync 
+  plextraktsync:
+    image: ghcr.io/taxel/plextraktsync
+    container_name: plextraktsync
+    networks:
+      - npm_proxy
+    command: sync
+    restart: on-failure:2
+    volumes:
+      - $DOCKERDIR/appdata/plextraktsync/config:/config
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+# Plex Meta Manager
+  plex-meta-manager:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    image: meisnate12/plex-meta-manager:latest
+    container_name: plex-meta-manager
+    environment:
+      TZ: '$TZ'
+      PUID: '$PUID'
+      PGID: '$PGID'
+      PMM_CONFIG: '/config/config.yml' #optional
+      PMM_TIME: '03:00' #optional
+      PMM_RUN: 'False' #optional
+      PMM_TEST: 'False' #optional
+      PMM_NO_MISSING: 'False' #optional
+    volumes:
+      - $DOCKERDIR/appdata/pmm/config:/config
+# Jellyfin 
+#  jellyfin:
+#    <<: *common-keys-media # See EXTENSION FIELDS >
+#    image: lscr.io/linuxserver/jellyfin:latest
+#    container_name: jellyfin
+#    ports:
+#      - '8096:8096'
+#      - '8920:8920' #optional
+#      - '7359:7359/udp' #optional
+#      - '1900:1900/udp' #optional
+#    volumes:
+#      - $DOCKERDIR/appdata/jellyfin/config:/config
+#      - $DATADIR:/storage
+#    environment:
+#      TZ: '$TZ'
+#      PUID: '$PUID'
+#      PGID: '$PGID'
+#      JELLYFIN_PublishedServerUrl: '' #optional
+# MeTube - Youtube Downloader and Many More
+  metube:
+    <<: *common-keys-apps # See EXTENSION FIELDS >
+    image: ghcr.io/alexta69/metube
+    container_name: metube
+    ports:
+      - '8081:8081'
+    volumes:
+      - $DOCKERDIR/appdata/metube/config:/config
+      - $DATADIR/downloads/metube:/storage/downloads
+    environment:
+      PUID: '$PUID'
+      PGID: '$PGID'
+      UMASK: '022'
+      DARK_MODE: 'true'
+      DOWNLOAD_DIR: '$DATADIR/downloads/metube'
+#      AUDIO_DOWNLOAD_DIR: '$DATADIR/downloads/metube/mp3'
+# Nginx Web-Server
+  web:
+    <<: *common-keys-apps
+    container_name: nginx-web
+    image: nginx:latest
+    ports:
+      - "84:80"
+    volumes:
+      -  $DOCKERDIR/appdata/nginxweb/html/src:/usr/share/nginx/html
+    links:
+      - php
+  php:
+    <<: *common-keys-apps
+    image: php:7-fpm
+    volumes:
+      - $DOCKERDIR/appdata/nginxweb/php/src:/usr/local/etc/php
+# Code-Server - Code Editor
+  code-server:
+    <<: *common-keys-apps # See EXTENSION FIELDS >
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: code-server
+    ports:
+      - '8444:8443'
+    volumes:
+      - $DOCKERDIR/appdata/code-server/config:/config
+      - /home/flexnet/docker:/docker
+    environment:
+      PUID: '$PUID'
+      PGID: '$PGID'
+      PASSWORD: '$PASSWORD'
+      HASHED_PASSWORD: '' #optional
+      SUDO_PASSWORD: '$SUDO_PASSWORD' #optional
+      SUDO_PASSWORD_HASH: '' #optional
+      PROXY_DOMAIN: '$PROXY_DOMAIN' #optional
+      DEFAULT_WORKSPACE: '$DEFAULT_WORKSPACE'
+
+# Dozzle - Real-time Docker Log Viewer
+  dozzle:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    ports:
+      - "8082:8080" # qBittorrent is using port 8080
+    environment:
+      DOZZLE_LEVEL: 'info'
+      DOZZLE_TAILSIZE: '300'
+      DOZZLE_FILTER: 'status=running'
+      USERNAME: '$USER'
+      PASSWORD: '$PASSWORD'
+      PUID: '$PUID'
+      PGID: '$PGID'
+      # DOZZLE_FILTER: 'label=log_me' # limits logs displayed to containers with this label.
+      # DOCKER_HOST: tcp://socket-proxy:2375 # Use this instead if you have Socket Proxy enabled.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Use Docker Socket Proxy and comment this line for improved security.
+    healthcheck:
+      test: [ "CMD", "/dozzle", "healthcheck" ]
+      interval: 3s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+# lazydocker - A simple terminal UI for both docker and docker-compose
+#  lazydocker:
+#    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+#    build:
+#      context: https://github.com/jesseduffield/lazydocker.git
+#      args:
+#        BASE_IMAGE_BUILDER: golang
+#        GOARCH: amd64
+#        GOARM:
+#    image: lazyteam/lazydocker
+#    container_name: lazydocker
+#    stdin_open: true
+#    tty: true
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#      - $DOCKERDIR/appdata/lazydocker/config:/.config/jesseduffield/lazydocker
+# Wiki.js - Wiki
+  wikijs:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    image: lscr.io/linuxserver/wikijs:latest
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+    volumes:
+      - $DOCKERDIR/appdata/wikijs/config:/config
+      - $DOCKERDIR/appdata/wikijs/data:/data
+    environment:
+      PUID: '$PUID'
+      PGID: '$PGID'
+      TZ: '$TZ'
+      DB_TYPE: 'postgres'
+      DB_HOST: 'db'
+      DB_PORT: '5432'
+      DB_USER: '$USER'
+      DB_PASS: '$PASSWORD'
+      DB_NAME: 'wiki'
+
+# Postgres - Database
+  db:
+    <<: *common-keys-apps # See EXTENSION FIELDS at the top
+    image: postgres:11-alpine
+    logging:
+      driver: "none"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: wiki
+      POSTGRES_PASSWORD: '$PASSWORD'
+      POSTGRES_USER: '$USER'
+      PUID: '$PUID'
+      PGID: '$PGID'
+volumes:
+  db-data:
+
