@@ -86,12 +86,16 @@ services:
     ports:
       - 33306:3306
     environment:
-      MYSQL_ROOT_PASSWORD: 'npm'
+      # MYSQL_ROOT_PASSWORD: "npm"  # use secret instead
+      MYSQL_ROOT_PASSWORD__FILE: /run/secrets/DB_ROOT_PWD
       MYSQL_DATABASE: 'npm'
       MYSQL_USER: 'npm'
       MYSQL_PASSWORD: 'npm'
     volumes:
       - $APPDATADIR/db_data:/var/lib/mysql
+    secrets:
+      - DB_ROOT_PWD
+      - MYSQL_PWD
   portainer:
     <<: *common-keys-core
     image: portainer/portainer
