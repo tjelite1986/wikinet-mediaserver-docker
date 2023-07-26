@@ -31,6 +31,7 @@ x-common-keys-apps: &common-keys-apps
   security_opt:
     - no-new-privileges:true
   restart: unless-stopped
+  
 x-common-keys-core: &common-keys-core
   networks:
     - npm_proxy
@@ -98,12 +99,14 @@ services:
     secrets:
       - DB_ROOT_PWD
       - MYSQL_PWD
+      
   portainer:
     <<: *common-keys-core
     image: portainer/portainer
     volumes:
       - $APPDATADIR/portainer:/data
       - /var/run/docker.sock:/var/run/docker.sock
+      
   radarr:
     <<: *common-keys-apps
     container_name: radarr
