@@ -18,6 +18,8 @@ x-environment: &default-tz-puid-pgid
 x-common-keys-apps: &common-keys-apps
   networks:
     - npm_proxy
+ # working_dir:
+ #   - $APPDATADIR
   security_opt:
     - no-new-privileges:true
   restart: unless-stopped
