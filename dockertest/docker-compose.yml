@@ -23,22 +23,49 @@ x-common-keys-apps: &common-keys-apps
   restart: unless-stopped
 
 services:
-
+# https://github.com/NginxProxyManager/nginx-proxy-manager/blob/docker-user-group/docker/docker-compose.dev.yml
+#link to npm
   npm:
     <<: *common-keys-apps
-    container_name: npm
+    container_name: npm_core
     image: jc21/nginx-proxy-manager:v3
     ports:
-      - '80:80'
-      - '443:443'
-      - '81:81'
+      - 3080:80
+      - 3081:81
+      - 3443:443
     volumes:
-      - $APPDATADIR/npm:/data
-      - $APPDATADIR/letsencrypt:/etc/letsencrypt
+      - $APPDATADIR/npm_data:/data
+      - $APPDATADIR/le_data:/etc/letsencrypt
+      # Need to check setting
+      #- ../backend:/app
+      #- ../frontend:/app/frontend
+      #- ../global:/app/global
     environment:
       <<: *default-tz-puid-pgid
-      DB_SQLITE_FILE: '/config/database.sqlite'
+      DB_MYSQL_HOST: 'db'
+      DB_MYSQL_PORT: '3306'
+      DB_MYSQL_USER: 'npm'
+      DB_MYSQL_PASSWORD: 'npm'
+      DB_MYSQL_NAME: 'npm'
+      #DB_SQLITE_FILE: '/config/database.sqlite'
       DISABLE_IPV6: 'true'
+    depends_on:
+      - db
+   # NEED TO CHECK THIS SETTING.
+   # working_dir: $APPDATADIR
+  db:
+    <<: *common-keys-apps
+    image: jc21/mariadb-aria
+    container_name: npm_db
+    ports:
+      - 33306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: 'npm'
+      MYSQL_DATABASE: 'npm'
+      MYSQL_USER: 'npm'
+      MYSQL_PASSWORD: 'npm'
+    volumes:
+      - $APPDATADIR/db_data:/var/lib/mysql
   radarr:
     <<: *common-keys-apps
     container_name: radarr
@@ -106,3 +133,10 @@ services:
       <<: *default-tz-puid-pgid
       UMASK_SET: '022' #optional
       DELUGE_LOGLEVEL: 'error' #optional
+volumes:
+  npm_data:
+    name: npm_data
+  le_data:
+    name: npm_le_data
+  db_data:
+    name: npm_db_data
