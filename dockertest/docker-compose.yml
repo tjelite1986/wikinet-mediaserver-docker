@@ -7,6 +7,8 @@ secrets:
     file: ./secrets/db_root_pwd.txt
   MYSQL_PWD:
     file: ./secrets/mysql_pwd.txt
+  PLEX_CLAIM:
+    file: ./secrets/plex_claim.txt
     
 networks:
   default:
@@ -177,6 +179,24 @@ services:
       <<: *default-tz-puid-pgid
       UMASK_SET: '022' #optional
       DELUGE_LOGLEVEL: 'error' #optional
+  plex:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    port:
+      - 32400:32400
+    volumes:
+      - $APPDATADIR/plex:/config
+      - $TVDIR:/tv
+      - $MOVIEDIR:/movies
+    environment:
+      <<: *default-tz-puid-pgid
+      VERSION: 'latest'
+      HOSTNAME: '$PLEX_HOSTNAME'
+      PLEX_CLAIM: '$PLEX_CLAIM'
+      PLEX_UID: '$PUID'
+      PLEX_GID: '$PGID'
+      
 volumes:
   npm_data:
     name: npm_data
