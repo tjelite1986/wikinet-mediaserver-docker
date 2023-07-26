@@ -194,6 +194,7 @@ services:
       VERSION: 'latest'
       HOSTNAME: '$PLEX_HOSTNAME'
       PLEX_CLAIM: '$PLEX_CLAIM'
+      PLEX_CLAIM_PASSWORD__FILE: /run/secrets/PLEX_CLAIM
       PLEX_UID: '$PUID'
       PLEX_GID: '$PGID'
       
