@@ -73,6 +73,7 @@ services:
       # If you would rather use Sqlite, remove all DB_MYSQL_* lines above
       # comment this if IPv6 is enabled on your host
       DISABLE_IPV6: 'true'
+      X_FRAME_OPTIONS: "sameorigin"
     secrets:
       - MYSQL_PWD
     depends_on:
