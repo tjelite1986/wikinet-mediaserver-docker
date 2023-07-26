@@ -46,7 +46,7 @@ services:
 #link to npm
   npm:
     <<: *common-keys-apps
-    container_name: npm_core
+    container_name: npm
     image: jc21/nginx-proxy-manager:v3
     ports:
       # Public HTTP Port:
@@ -103,8 +103,10 @@ services:
   portainer:
     <<: *common-keys-core
     image: portainer/portainer
+    Port:
+      - 9443:9443
     volumes:
-      - $APPDATADIR/portainer:/data
+      - $APPDATADIR/portainer_data:/data
       - /var/run/docker.sock:/var/run/docker.sock
       
   radarr:
@@ -181,3 +183,5 @@ volumes:
     name: npm_le_data
   db_data:
     name: npm_db_data
+  portainer_data:
+    name: portainer_data
