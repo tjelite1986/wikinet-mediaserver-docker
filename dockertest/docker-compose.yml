@@ -108,7 +108,8 @@ services:
     volumes:
       - $APPDATADIR/portainer_data:/data
       - /var/run/docker.sock:/var/run/docker.sock
-      
+    environment:
+      <<: *default-tz-puid-pgid
   radarr:
     <<: *common-keys-apps
     container_name: radarr
