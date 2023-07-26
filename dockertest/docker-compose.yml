@@ -7,6 +7,7 @@ secrets:
     file: ./secrets/db_root_pwd.txt
   MYSQL_PWD:
     file: ./secrets/mysql_pwd.txt
+    
 networks:
   default:
     driver: bridge
